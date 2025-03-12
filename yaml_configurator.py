@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 YAML文件配置器 [YAML File Configurator]
+VERSION: 2.0
 
 描述 [Description]：
     在初始化YAML文件后，你可以获得一个YamlConfigurator对象；
@@ -18,45 +19,52 @@ YAML文件配置器 [YAML File Configurator]
     4. 追加写入YAML文件(追加列表)； [Append and write to YAML file (append list).]
     5. 创建、安全读取YAML文件(ruamel.yaml.YAML)。 [Create and safely read YAML files (using ruamel.yaml.YAML).]
 
+V2.0版本更新内容 [2.0 version update content]:
+    使用PyYaml代替ruamel.yaml，可将嵌套字典内容写入为yml格式而不是字典。
+    [Use PyYaml instead of ruamel.yaml, which can write nested dictionary content as yml format instead of dictionary.]
+
+Python处理yaml和嵌套数据结构的一些技巧:
+    - https://blog.csdn.net/m0_58477260/article/details/125238986
+
 Examples:
     >>> from yaml_configurator import YamlConfigurator
     >>> # 1. 创建一个YAML文件('ignore_exists'忽略存在的文件并覆盖)。 [Create a YAML file ('ignore_exists' ignores existing files and overrides).]
-    >>> yaml = YamlConfigurator(file_path='config.yaml')
-    >>> yaml.create({'key1': {'sub_key1': 'value11'}, 'key2': 'value2'}, ignore_exists=True)
-    >>> yaml.data
+    >>> obj = YamlConfigurator(file_path='config.yaml')
+    >>> obj.create({'key1': {'sub_key1': 'value11'}, 'key2': 'value2'}, ignore_exists=True)
+    >>> obj.data
     {'key1': {'sub_key1': 'value11'}, 'key2': 'value2'}
     >>> # 2.1 加载一个YAML文件。 [Load a YAML file.]
-    >>> yaml = YamlConfigurator(file_path='config.yaml').safe_load()
+    >>> obj = YamlConfigurator(file_path='config.yaml').safe_load()
     >>> # 2.2 获取已存在键的值 (key: key1 - sub_key1)。 [Get the value of an existing key.]
-    >>> yaml.get('key1', 'sub_key1')
+    >>> obj.get('key1', 'sub_key1')
     'value11'
     >>> # 2.3 获取多个已存在键的值 (keys: key1 - sub_key1, key2)。 [Get the values of multiple existing keys.]
-    >>> yaml.gets(['key1', 'sub_key1'], 'key2')
+    >>> obj.gets(['key1', 'sub_key1'], 'key2')
     ['value11', 'value2']
     >>> # 2.4 获取不存在键的值，并给定默认值 (key: key2 - sub_key1)。 [Get the value of a non-existing key and give a default value.]
-    >>> yaml.get('key2', 'sub_key1', default='default_value')
+    >>> obj.get('key2', 'sub_key1', default='default_value')
     'default_value'
     >>> # 2.5 覆盖更新YAML文件中键的值 (key: key1)。 [Overwrite the value of a key in the YAML file.]
-    >>> yaml.update({'key1': {'sub_key1': ['value11', 'value12'], 'sub_key2': 'value21'}})
-    >>> yaml.data
+    >>> obj.update({'key1': {'sub_key1': ['value11', 'value12'], 'sub_key2': 'value21'}})
+    >>> obj.data
     {'key1': {'sub_key1': ['value11', 'value12'], 'sub_key2': 'value21'}, 'key2': 'value2'}
     >>> # 2.6 追加更新YAML文件中键的列表 (key: key1 - sub_key)。 [Append update the list of a key in the YAML file.]
-    >>> yaml.update({'key1': {'sub_key1': ['value13']}, 'key3': 'value3'}, append_list=True)
-    >>> yaml.data
+    >>> obj.update({'key1': {'sub_key1': ['value13']}, 'key3': 'value3'}, append_list=True)
+    >>> obj.data
     {'key1': {'sub_key1': ['value11', 'value12', 'value13'], 'sub_key2': 'value21'}, 'key2': 'value2', 'key3': 'value3'}
     >>> # 2.7.1 获取多个已存在键的值，且有的存在同一父源 (keys: key1 - sub_key1, key1 - sub_key2, key2)。
     >>> # [Get the values of multiple existing keys, and some exist in the same parent source.]
-    >>> yaml.gets(['key1', ['sub_key1', 'sub_key2']], 'key2')
+    >>> obj.gets(['key1', ['sub_key1', 'sub_key2']], 'key2')
     [[['value11', 'value12', 'value13'], 'value21'], 'value2']
     >>> # 2.7.2 再进行解包，愉快地获得YAML文件中更深层的值。 [Unpack again to happily get deeper values in the YAML file.]
-    >>> (sub_key1, sub_key2), key2 = yaml.gets(['key1', ['sub_key1', 'sub_key2']], 'key2')
+    >>> (sub_key1, sub_key2), key2 = obj.gets(['key1', ['sub_key1', 'sub_key2']], 'key2')
     >>> sub_key1, sub_key2, key2
     (['value11', 'value12', 'value13'], 'value21', 'value2')
 """
 import os
 from typing import Any, Dict, List, Union
 
-from ruamel.yaml import YAML
+import yaml
 
 
 class YamlConfigurator:
@@ -83,7 +91,7 @@ class YamlConfigurator:
         if os.path.exists(file_path) and create:
             raise FileExistsError(f'The file already exists: {file_path}')
 
-        yaml = YAML(typ='safe')
+        # yaml = YAML(typ='safe')
         with open(file_path, 'w', encoding='utf-8') as file:
             yaml.dump(data, file)
 
@@ -187,9 +195,9 @@ class YamlConfigurator:
         :return: YamlConfigurator对象。 [YamlConfigurator object.]
         """
         try:
-            yaml = YAML(typ='safe')
+            # yaml = YAML(typ='safe')
             with open(self.file_path, 'r', encoding='utf-8') as file:
-                self._data = yaml.load(file)
+                self._data = yaml.safe_load(file)
         except FileNotFoundError as e:
             if default is None:
                 raise e
@@ -293,7 +301,7 @@ def test_configurator():
     单元测试。 [Single unit test.]
     """
     # 创建一个临时文件路径。 [Create a temporary file path.]
-    file_path = "test.yaml"
+    file_path = "test.obj"
 
     # 测试1：创建一个新的YAML文件。 [Create a new YAML file.]
     yaml_configurator = YamlConfigurator(file_path)
