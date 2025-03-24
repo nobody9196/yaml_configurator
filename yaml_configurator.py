@@ -62,7 +62,7 @@ Examples:
     (['value11', 'value12', 'value13'], 'value21', 'value2')
 """
 import os
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 import yaml
 
@@ -76,12 +76,12 @@ class YamlConfigurator:
         data: 配置数据。 [YAML file data, default: None.]
     """
 
-    def __init__(self, file_path: str = None, data: Dict = None):
+    def __init__(self, file_path: Optional[str] = None, data: Optional[Dict] = None):
         self.file_path = file_path
         self._data = data
 
     def __str__(self):
-        return os.path.basename(self.file_path) if self.file_path is not None else None
+        return os.path.basename(self.file_path) if self.file_path is not None else ''
 
     @staticmethod
     def __write(file_path: str, data: Dict, create: bool = False) -> None:
@@ -96,7 +96,7 @@ class YamlConfigurator:
             yaml.dump(data, file)
 
     @classmethod
-    def __get(cls, *args: Union[str, List[str]], data: Dict, parent_args: List = None, **kwargs) -> Any:
+    def __get(cls, *args: Union[str, List[str]], data: Dict, parent_args: Optional[List] = None, **kwargs) -> Any:
         """
         获取子值。 [Get child value.]
 
@@ -186,16 +186,21 @@ class YamlConfigurator:
         获取数据副本。 [Get a copy of the data.]
         :return: 数据副本。 [data copy.]
         """
+        if self._data is None:
+            raise ValueError('Data is not loaded.')
+
         return self._data.copy()
 
-    def safe_load(self, default: Dict = None) -> 'YamlConfigurator':
+    def safe_load(self, default: Optional[Dict] = None) -> 'YamlConfigurator':
         """
         安全加载 YAML 文件。 [Safe load YAML file.]
         :param default: 默认值。 [default value.]
         :return: YamlConfigurator对象。 [YamlConfigurator object.]
         """
+        if self.file_path is None:
+            raise ValueError('File path is not specified.')
+        
         try:
-            # yaml = YAML(typ='safe')
             with open(self.file_path, 'r', encoding='utf-8') as file:
                 self._data = yaml.safe_load(file)
         except FileNotFoundError as e:
@@ -209,6 +214,9 @@ class YamlConfigurator:
         """
         创建 YAML 文件。 [Create YAML file.]
         """
+        if self.file_path is None:
+            raise ValueError('File path is not specified.')
+
         self.__write(self.file_path, data, create=ignore_exists == False)
         self._data = data
 
@@ -216,6 +224,9 @@ class YamlConfigurator:
         """
         覆盖写入 YAML 文件。 [Override write YAML file.]
         """
+        if self.file_path is None:
+            raise ValueError('File path is not specified.')
+
         self.__write(self.file_path, data)
         self._data = data
 
@@ -227,6 +238,11 @@ class YamlConfigurator:
         :param append_list: 是否将新项追加到列表中，而不是替换它们。 [Whether to append new items to the list instead of replacing them.]
         :return: None
         """
+        if self.file_path is None:
+            raise ValueError('File path is not specified.')
+        if self._data is None:
+            raise ValueError('Data is not loaded.')
+
         new_data = self._recursive_update(self._data, data, append_list)
         self.__write(self.file_path, new_data)
         self._data = new_data
@@ -242,6 +258,9 @@ class YamlConfigurator:
          [The value of the key. if it does not exist, return the default value.
           if there is no default value, an exception will be thrown.]
         """
+        if self._data is None:
+            raise ValueError('Data is not loaded.')
+            
         data = self.__get(*args, data=self._data, **kwargs)
 
         if not return_yc:
@@ -303,61 +322,64 @@ def test_configurator():
     # 创建一个临时文件路径。 [Create a temporary file path.]
     file_path = "test.obj"
 
-    # 测试1：创建一个新的YAML文件。 [Create a new YAML file.]
-    yaml_configurator = YamlConfigurator(file_path)
-    yaml_configurator.create({"name": "John", "age": 30})
-    assert os.path.exists(file_path)
+    try:
+        # 测试1：创建一个新的YAML文件。 [Create a new YAML file.]
+        yaml_configurator = YamlConfigurator(file_path)
+        yaml_configurator.create({"name": "John", "age": 30})
+        assert os.path.exists(file_path)
 
-    # 测试2：读取YAML文件。 [YAML file reading.]
-    yaml_configurator.safe_load()
-    assert yaml_configurator.get("name") == "John"
-    assert yaml_configurator.get("age") == 30
+        # 测试2：读取YAML文件。 [YAML file reading.]
+        yaml_configurator.safe_load()
+        assert yaml_configurator.get("name") == "John"
+        assert yaml_configurator.get("age") == 30
 
-    # 测试3：更新YAML文件。 [Update YAML file.]
-    yaml_configurator.update({"age": 31})
-    assert yaml_configurator.get("age") == 31
+        # 测试3：更新YAML文件。 [Update YAML file.]
+        yaml_configurator.update({"age": 31})
+        assert yaml_configurator.get("age") == 31
 
-    # 测试4：递归更新YAML文件。 [Recursive update YAML file.]
-    yaml_configurator.update({"address": {"city": "New York", "zip": "10001"}})
-    assert yaml_configurator.get("address", "city") == "New York"
-    assert yaml_configurator.get("address", "zip") == "10001"
+        # 测试4：递归更新YAML文件。 [Recursive update YAML file.]
+        yaml_configurator.update({"address": {"city": "New York", "zip": "10001"}})
+        assert yaml_configurator.get("address", "city") == "New York"
+        assert yaml_configurator.get("address", "zip") == "10001"
 
-    # 测试5：安全加载YAML文件。 [YAML file safe loading.]
-    yaml_configurator = YamlConfigurator(file_path).safe_load()
-    assert yaml_configurator.get("name") == "John"
-    assert yaml_configurator.get("age") == 31
-    assert yaml_configurator.get("address", "city") == "New York"
-    assert yaml_configurator.get("address", "zip") == "10001"
+        # 测试5：安全加载YAML文件。 [YAML file safe loading.]
+        yaml_configurator = YamlConfigurator(file_path).safe_load()
+        assert yaml_configurator.get("name") == "John"
+        assert yaml_configurator.get("age") == 31
+        assert yaml_configurator.get("address", "city") == "New York"
+        assert yaml_configurator.get("address", "zip") == "10001"
 
-    # 测试6：获取不存在的键。 [Get non-existent key.]
-    assert yaml_configurator.get("gender", default=None) is None
+        # 测试6：获取不存在的键。 [Get non-existent key.]
+        assert yaml_configurator.get("gender", default=None) is None
 
-    # 测试7：获取不存在的嵌套键。 [Get non-existent nested key.]
-    assert yaml_configurator.get("address", "state", default=None) is None
+        # 测试7：获取不存在的嵌套键。 [Get non-existent nested key.]
+        assert yaml_configurator.get("address", "state", default=None) is None
 
-    # 测试8：获取默认值。 [Get default value.]
-    assert yaml_configurator.get("gender", default="Male") == "Male"
+        # 测试8：获取默认值。 [Get default value.]
+        assert yaml_configurator.get("gender", default="Male") == "Male"
 
-    # 测试9：获取嵌套键的默认值。 [Get default value of nested key.]
-    assert yaml_configurator.get("address", "state", default="NY") == "NY"
+        # 测试9：获取嵌套键的默认值。 [Get default value of nested key.]
+        assert yaml_configurator.get("address", "state", default="NY") == "NY"
 
-    # 测试10：覆盖写入YAML文件。 [Overwrite writing YAML file.]
-    yaml_configurator.write({"name": "Jane", "age": 25})
-    assert yaml_configurator.get("name") == "Jane"
-    assert yaml_configurator.get("age") == 25
+        # 测试10：覆盖写入YAML文件。 [Overwrite writing YAML file.]
+        yaml_configurator.write({"name": "Jane", "age": 25})
+        assert yaml_configurator.get("name") == "Jane"
+        assert yaml_configurator.get("age") == 25
 
-    # 测试11：更新列表。 [Update list.]
-    yaml_configurator.update({"hobbies": ["reading", "painting"]}, append_list=True)
-    assert yaml_configurator.get("hobbies") == ["reading", "painting"]
+        # 测试11：更新列表。 [Update list.]
+        yaml_configurator.update({"hobbies": ["reading", "painting"]}, append_list=True)
+        assert yaml_configurator.get("hobbies") == ["reading", "painting"]
 
-    # 测试12：递归更新列表。 [Recursive update list.]
-    yaml_configurator.update({"hobbies": [{"name": "swimming", "level": "intermediate"}]}, append_list=True)
-    assert {"name": "swimming", "level": "intermediate"} in yaml_configurator.get("hobbies")
+        # 测试12：递归更新列表。 [Recursive update list.]
+        yaml_configurator.update({"hobbies": [{"name": "swimming", "level": "intermediate"}]}, append_list=True)
+        hobbies = yaml_configurator.get("hobbies")
+        assert isinstance(hobbies, list)
+        assert {"name": "swimming", "level": "intermediate"} in hobbies
 
-    # 删除临时文件。 [Delete temporary file.]
-    os.remove(file_path)
-
-    print("All test cases pass.")
+        print("All test cases pass.")
+    finally:
+        # 删除临时文件。 [Delete temporary file.]
+        os.remove(file_path)
 
 
 if __name__ == "__main__":
